@@ -29,8 +29,6 @@ collection *new_collection() {
 }
 
 void mod_offset(unsigned long index, collection *col, offset offset) {
-    printf("Index in mod_offset: %lu\n", index);
-    printf("block_size: %lu\n", sizeof(base) * index);
     base block = col->blocks[index];
     block.offset = offset;
     col->blocks[index] = block;
@@ -38,7 +36,6 @@ void mod_offset(unsigned long index, collection *col, offset offset) {
 
 unsigned long append(base block, collection *col) {
     unsigned long block_amount = sizeof(base) * (col->block_len + 1);
-    printf("block_amount: %lu\n", block_amount);
     base *new_blocks = malloc(block_amount);
     if (new_blocks == 0) {
         fprintf(stderr,"Failed to allocate memory!");
@@ -48,9 +45,6 @@ unsigned long append(base block, collection *col) {
     free(col->blocks);
     col->blocks = new_blocks;
     col->blocks[col->block_len++] = block;
-    printf("Block name: %s\n", col->blocks[col->block_len].name);
-    printf("Inputed block name: %s\n", block.name);
-    printf("Total blocks: %lu\n", col->block_len);
     return col->block_len;
 }
 
@@ -153,7 +147,6 @@ char* compile(collection *col) {
             p = stpcpy(p, collection_buf);
         }
         stpcpy(p, block_buf);
-        printf("New col buf: %s\n", new_col_buf);
         collection_buf = new_col_buf;
     }
 
