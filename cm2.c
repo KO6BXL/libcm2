@@ -30,7 +30,6 @@ collection *new_collection() {
 
 void mod_offset(unsigned long index, collection *col, offset offset) {
     base block = col->blocks[index];
-    printf("index: %lu\n", index);
     block.offset = offset;
     col->blocks[index] = block;
 }
@@ -129,7 +128,6 @@ char* compile(collection *col) {
     block_count++;
     char *block_buf = malloc(50);
     for (unsigned long i = 0; i < block_count-1; i++) {
-        block_debug(col->blocks[i]);
         build_block_str(col->blocks[i], block_buf);
         char *new_col_buf = 0;
         if (collection_buf == 0) {
