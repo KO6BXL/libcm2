@@ -5,49 +5,67 @@
 #include <stdlib.h>
 #include <string.h>
 
+//Creates a collection
 collection *new_collection() {
+    //Declare empty values for the collection struct
     base bases = {0};
     connection connections = {0};
     offset offset = {0};
 
+    //Allocate for blocks
     base *base_p = malloc(sizeof(bases));
     *base_p = bases;
 
+    //Allocate for connections
     connection *connection_p = malloc(sizeof(connections));
     *connection_p = connections;
 
+    //Allocate for offset
+    //TODO: Get rid of offset
     struct offset *offset_p = malloc(sizeof(offset));
     *offset_p = offset;
 
+    //Create final struct
     collection col = {base_p, 0, connection_p, 0, offset_p};
-
     collection *col_p = malloc(sizeof(col));
-
     *col_p = col;
-
+    //Return pointer to collection
     return col_p;
 }
 
+//Offset block
 void mod_offset(unsigned long index, collection *col, offset offset) {
+    //Get block from collection
     base block = col->blocks[index];
+    //Set offset
     block.offset = offset;
+    //Write back to collection
     col->blocks[index] = block;
 }
 
+//Add a block to collection
 unsigned long append(base block, collection *col) {
+    //Get bytesize of the new block array
     unsigned long block_amount = sizeof(base) * (col->block_len + 1);
+    //Allocate new space
     base *new_blocks = malloc(block_amount);
     if (new_blocks == 0) {
         fprintf(stderr,"Failed to allocate memory!");
         return 0;
     }
+    //copy old data to the new space
     memcpy(new_blocks, col->blocks, sizeof(base) * col->block_len);
+    //Replace old pointer with new
     free(col->blocks);
     col->blocks = new_blocks;
+    //Append block and return its index (don't ask why the "++" and "- 1" are there, it works)
     col->blocks[col->block_len++] = block;
     return col->block_len - 1;
 }
 
+//connect block from to block to in collection
+//THIS FUNCTION IS NOT TESTED!
+//TODO: Test this function and fix any errors
 void connect(unsigned long from, unsigned long to, collection *col) {
     connection conn = (connection) {from, to};
     unsigned long conn_amount = sizeof(connection) * (col->connection_len + 1);
@@ -62,6 +80,9 @@ void connect(unsigned long from, unsigned long to, collection *col) {
     col->connections[col->connection_len++] = conn;
 }
 
+//merge two collections together
+//THIS FUNCTION IS NOT TESTED!
+//TODO: Test this function and fix any errors
 collection *merge( collection *one,  collection *two) {
     unsigned long total_size = sizeof(one) + sizeof(two);
     collection *new_col = malloc(total_size);
@@ -72,8 +93,11 @@ collection *merge( collection *one,  collection *two) {
     return new_col;
 }
 
- base clean_block( base block) {
-     base new_block = block;
+//helper function for block constructors
+//NOTE: This function wipes the offset, properties, and state; so don't use it after setting these attributes
+ base clean_block(base block) {
+    //new block to eventually return
+    base new_block = block;
     for (int i = 0; i<5; i++) {
         new_block.properties[i] = 0;
     }
@@ -82,24 +106,35 @@ collection *merge( collection *one,  collection *two) {
     return new_block;
 }
 
+//Cleans up memory in project
+//This function has not been tested
+//TODO: Test this function and fix any bugs
 void clean_cm2( collection *col) {
     free(col->blocks);
     free(col->connections);
     free(col);
 }
 
+//Helper function for compilation
+//Builds a string in buf based on data in block
 void build_block_str(base block, char *buf) {
+    //create a pointer to the end of the buffer
     char *buf_end = buf;
+    //buffer to store block id
     char idbuf[2] = {0};
     sprintf(idbuf, "%u,", block.id);
+    //Write to buffer
     buf_end = stpcpy(buf, idbuf);
 
+    //if the state is true (useful for setting state in flipflops)
     if (block.state) {
         buf_end = stpcpy(buf_end, "1,");
     } else {
         buf_end = stpcpy(buf_end, "0,");
     }
 
+    //Create and write offsets
+    //TODO: Figure out a way to stop it from writing in scientific notation whenever the data gets too small
     char offset_buf[15];
     sprintf(offset_buf, "%g,", block.offset.x);
     buf_end = stpcpy(buf_end, offset_buf);
@@ -110,61 +145,85 @@ void build_block_str(base block, char *buf) {
     sprintf(offset_buf, "%g,", block.offset.z);
     buf_end = stpcpy(buf_end, offset_buf);
 
+    //Create and write properties
     char prop_buf[5] = {0};
     for (int i = 0; i < 6; i++) {
+        //If there is no property, don't waste time on it
+        //TODO: This is a really bad way to do it, if someone wanted a color value of 0, it's not put in the final string. We need a way to track properties
         if (block.properties[i] == 0) continue;
         printf(prop_buf, "%d", block.properties[i]);
         buf_end = stpcpy(buf_end, prop_buf);
 
+        //stop trailing "+"
         if (i != 5) {
             buf_end = stpcpy(buf_end, "+");
         }
     }
 }
 
+//Compiles collection into a string
+//TODO: Finish function by adding connection functionality
 char* compile(collection *col) {
+    //create the main buffer to store output
     char *collection_buf = 0;
     unsigned long block_count = col->block_len;
+    //Genuinely I have no idea what this is doing here, perhaps to stop garbage from being spat out by the for loop?
     block_count++;
+    //Create buffer for the helper function to write into
     char *block_buf = malloc(50);
     for (unsigned long i = 0; i < block_count-1; i++) {
+        //build block
         build_block_str(col->blocks[i], block_buf);
+        //set new buffer for reallocation
         char *new_col_buf = 0;
+        //check if we need to include the size of the main buffer
         if (collection_buf == 0) {
             new_col_buf = malloc(strlen(block_buf)+1);
         } else {
             new_col_buf = malloc(strlen(collection_buf)+strlen(block_buf));
         }
+        //allocation check
         if (new_col_buf == 0) {
             fprintf(stderr, "Failed to allocate collection buffer!");
             free(block_buf);
             free(collection_buf);
             return 0;
         }
+        //pointer to the end of the new buffer
         char *p = new_col_buf;
         if (collection_buf != 0) {
+            //append old data
             p = stpcpy(p, collection_buf);
         }
+        //append block string
         p = stpcpy(p, block_buf);
+        //if it is the end of the block string, we don't want to write a semicolon
         if (i < block_count-2) {
             stpcpy(p, ";");
         }
+        //point the main buffer to the new one
+        //TODO: I am fairly positive this causes a memory leak, as the main buffer is never freed.
         collection_buf = new_col_buf;
     }
+    //free memory (no way)
     free(block_buf);
 
+    //TODO: Add connection functionality here
 
+    //return string
     return collection_buf;
 }
 
+//helper function to block_debug()
 void color_debug(color color) {
     printf("R: %d G: %d B: %d\n", color.R, color.G, color.B);
 }
 
+//helper function to block_debug()
 void offset_debug(offset offset) {
     printf("X: %g Y: %g Z: %g\n", offset.x, offset.y, offset.z);
 }
-
+//Print out data about the block, use this to check blocks in the likely event this code breaks
 void block_debug(base block) {
     printf("Start of block debug\n");
     printf("Block ID: %d\nBlock Name: %s\nBlock state: %d\n", block.id, block.name, block.state);
@@ -178,7 +237,7 @@ void block_debug(base block) {
 }
 
 //Now we start with the blocks
-
+//I am not writing comments for each of these, however led will have comments
  base block_nor() {
      base nor;
      color nor_color = {255, 9, 0};
@@ -246,20 +305,24 @@ void block_debug(base block) {
 }
 
  base block_led( led_params params) {
+    //are we using defaults?
     bool use_default = false;
     if (params.do_I_exist == false) {
+        //defaults in case user provided NULL
         params = ( led_params) {( color) {175, 175, 175}, 100, 25, false, true};
         use_default = true;
     }
 
-     base led;
+    base led;
     strcpy(led.name, "LED");
     led.id = 6;
     led.color = params.color;
+    //used later for properties
     int analog_on = 0;
     if (params.analog == true) {
         analog_on = 1;
     }
+    //clean before editing
     led = clean_block(led);
     if (use_default == false) {
         led.properties[0] = (int) params.color.R;
@@ -273,8 +336,8 @@ void block_debug(base block) {
 }
 
  base block_sound(unsigned int frequency, unsigned char instrument) {
-     base sound;
-     color sound_color = {175, 131, 76};
+    base sound;
+    color sound_color = {175, 131, 76};
     strcpy(sound.name, "SOUND");
     sound.id = 7;
     sound.color = sound_color;
