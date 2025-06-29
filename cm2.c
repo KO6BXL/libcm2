@@ -30,6 +30,7 @@ collection *new_collection() {
 
 void mod_offset(unsigned long index, collection *col, offset offset) {
     base block = col->blocks[index];
+    printf("index: %lu\n", index);
     block.offset = offset;
     col->blocks[index] = block;
 }
@@ -45,7 +46,7 @@ unsigned long append(base block, collection *col) {
     free(col->blocks);
     col->blocks = new_blocks;
     col->blocks[col->block_len++] = block;
-    return col->block_len;
+    return col->block_len - 1;
 }
 
 void connect(unsigned long from, unsigned long to, collection *col) {
@@ -89,38 +90,37 @@ void clean_cm2( collection *col) {
 }
 
 void build_block_str(base block, char *buf) {
+    char *buf_end = buf;
     char idbuf[2] = {0};
     sprintf(idbuf, "%u,", block.id);
-    buf = stpcpy(buf, idbuf);
+    buf_end = stpcpy(buf, idbuf);
 
     if (block.state) {
-        buf = stpcpy(buf, "1,");
+        buf_end = stpcpy(buf_end, "1,");
     } else {
-        buf = stpcpy(buf, "0,");
+        buf_end = stpcpy(buf_end, "0,");
     }
 
     char offset_buf[15];
     sprintf(offset_buf, "%g,", block.offset.x);
-    buf = stpcpy(buf, offset_buf);
+    buf_end = stpcpy(buf_end, offset_buf);
 
     sprintf(offset_buf, "%g,", block.offset.y);
-    buf = stpcpy(buf, offset_buf);
+    buf_end = stpcpy(buf_end, offset_buf);
 
-    sprintf(offset_buf, "%g,", block.offset.y);
-    buf = stpcpy(buf, offset_buf);
-
+    sprintf(offset_buf, "%g,", block.offset.z);
+    buf_end = stpcpy(buf_end, offset_buf);
 
     char prop_buf[5] = {0};
     for (int i = 0; i < 6; i++) {
         if (block.properties[i] == 0) continue;
         printf(prop_buf, "%d", block.properties[i]);
-        buf = stpcpy(buf, prop_buf);
+        buf_end = stpcpy(buf_end, prop_buf);
 
         if (i != 5) {
-            buf = stpcpy(buf, "+");
+            buf_end = stpcpy(buf_end, "+");
         }
     }
-    buf = stpcpy(buf, ";");
 }
 
 char* compile(collection *col) {
@@ -128,11 +128,12 @@ char* compile(collection *col) {
     unsigned long block_count = col->block_len;
     block_count++;
     char *block_buf = malloc(50);
-    for (unsigned long i = 0; i < block_count; i++) {
+    for (unsigned long i = 0; i < block_count-1; i++) {
+        block_debug(col->blocks[i]);
         build_block_str(col->blocks[i], block_buf);
         char *new_col_buf = 0;
         if (collection_buf == 0) {
-            new_col_buf = malloc(strlen(block_buf));
+            new_col_buf = malloc(strlen(block_buf)+1);
         } else {
             new_col_buf = malloc(strlen(collection_buf)+strlen(block_buf));
         }
@@ -146,14 +147,37 @@ char* compile(collection *col) {
         if (collection_buf != 0) {
             p = stpcpy(p, collection_buf);
         }
-        stpcpy(p, block_buf);
+        p = stpcpy(p, block_buf);
+        if (i < block_count-2) {
+            stpcpy(p, ";");
+        }
         collection_buf = new_col_buf;
     }
-
     free(block_buf);
+
+
     return collection_buf;
 }
 
+void color_debug(color color) {
+    printf("R: %d G: %d B: %d\n", color.R, color.G, color.B);
+}
+
+void offset_debug(offset offset) {
+    printf("X: %g Y: %g Z: %g\n", offset.x, offset.y, offset.z);
+}
+
+void block_debug(base block) {
+    printf("Start of block debug\n");
+    printf("Block ID: %d\nBlock Name: %s\nBlock state: %d\n", block.id, block.name, block.state);
+    color_debug(block.color);
+    offset_debug(block.offset);
+    for (int i = 0; i < 5; i++) {
+        if (block.properties[i] == 0) continue;
+        printf("Prop #%d: %d\n", i, block.properties[i]);
+    }
+    printf("End of block debug\n");
+}
 
 //Now we start with the blocks
 

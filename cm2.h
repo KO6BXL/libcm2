@@ -56,6 +56,11 @@ typedef struct collection {
  collection *new_collection();
 
 /**
+ * @brief Prints debug statements about a block
+ * @param Block to debug
+ */
+void block_debug(base);
+/**
  * @brief Offset a block
  * @param Index of block
  * @param Collection that has the block
